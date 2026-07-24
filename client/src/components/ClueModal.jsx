@@ -1,6 +1,15 @@
+import { useEffect, useState } from 'react';
+
 // Full-screen active-clue overlay. Renders differently for host vs player.
 export default function ClueModal({ state, role, myId, onReveal, onJudge, onClose, onBuzz }) {
   const { activeClue, phase, board, players, buzzedPlayerId, answerRevealed, lockedOut } = state;
+  const key = activeClue ? `${activeClue.catIndex}-${activeClue.clueIndex}` : null;
+
+  // The host screen is usually the shared screen, so the answer stays hidden
+  // until it is deliberately peeked at or revealed to the room.
+  const [peek, setPeek] = useState(false);
+  useEffect(() => setPeek(false), [key]);
+
   if (!activeClue) return null;
 
   const cat = board.categories[activeClue.catIndex];
@@ -30,7 +39,19 @@ export default function ClueModal({ state, role, myId, onReveal, onJudge, onClos
         {/* ---------- HOST CONTROLS ---------- */}
         {role === 'host' && (
           <div className="host-controls">
-            {!answerRevealed && <div className="host-answer">Answer: {clue.answer}</div>}
+            {!answerRevealed &&
+              (peek ? (
+                <div className="host-answer">
+                  Answer: {clue.answer}
+                  <button className="btn tiny secondary peek-btn" onClick={() => setPeek(false)}>
+                    Hide
+                  </button>
+                </div>
+              ) : (
+                <button className="btn tiny secondary peek-btn" onClick={() => setPeek(true)}>
+                  👁 Peek at answer (this screen only)
+                </button>
+              ))}
 
             {phase === 'clue' && (
               <>

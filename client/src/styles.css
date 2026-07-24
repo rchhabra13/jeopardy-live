@@ -832,3 +832,9 @@ body.cursed {
   body.cursed { animation: none; }
   .clue-modal { animation: none; }
 }
+
+.peek-btn {
+  display: inline-block;
+  margin-left: 10px;
+  margin-bottom: 12px;
+}
