@@ -1,0 +1,8 @@
+services:
+  jeopardy:
+    build: .
+    image: jeopardy:latest
+    container_name: jeopardy
+    ports:
+      - "3001:3001"
+    restart: unless-stopped

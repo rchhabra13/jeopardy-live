@@ -1,0 +1,205 @@
+// In-memory room store + game logic. Rooms are lost on restart (fine for v1).
+
+const rooms = new Map();
+
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no easily-confused chars
+
+function genCode() {
+  let code;
+  do {
+    code = '';
+    for (let i = 0; i < 4; i++) {
+      code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    }
+  } while (rooms.has(code));
+  return code;
+}
+
+export function createRoom(hostId, board) {
+  const roomCode = genCode();
+  const room = {
+    roomCode,
+    hostId,
+    board,
+    players: {}, // id -> { id, name, score, connected }
+    phase: 'board', // 'board' | 'clue' | 'buzzed'
+    activeClue: null, // { catIndex, clueIndex }
+    buzzedPlayerId: null,
+    lockedOut: [], // player ids that already guessed wrong on the active clue
+    answerRevealed: false,
+  };
+  rooms.set(roomCode, room);
+  return room;
+}
+
+export function getRoom(roomCode) {
+  return rooms.get(roomCode);
+}
+
+export function findRoomByHost(hostId) {
+  for (const room of rooms.values()) if (room.hostId === hostId) return room;
+  return null;
+}
+
+export function findRoomByPlayer(socketId) {
+  for (const room of rooms.values()) {
+    if (room.players[socketId]) return room;
+    if (room.hostId === socketId) return room;
+  }
+  return null;
+}
+
+export function addPlayer(room, socketId, name) {
+  const existing = room.players[socketId];
+  room.players[socketId] = {
+    id: socketId,
+    name: name || existing?.name || 'Player',
+    score: existing?.score || 0,
+    connected: true,
+  };
+  return room.players[socketId];
+}
+
+function activeClueObj(room) {
+  if (!room.activeClue) return null;
+  const { catIndex, clueIndex } = room.activeClue;
+  return room.board.categories[catIndex]?.clues[clueIndex] || null;
+}
+
+export function selectClue(room, catIndex, clueIndex) {
+  const clue = room.board.categories[catIndex]?.clues[clueIndex];
+  if (!clue || clue.done) return;
+  room.activeClue = { catIndex, clueIndex };
+  room.phase = 'clue';
+  room.buzzedPlayerId = null;
+  room.lockedOut = [];
+  room.answerRevealed = false;
+}
+
+export function buzz(room, socketId) {
+  if (room.phase !== 'clue') return false;
+  if (!room.players[socketId]) return false;
+  if (room.lockedOut.includes(socketId)) return false;
+  room.buzzedPlayerId = socketId;
+  room.phase = 'buzzed';
+  return true;
+}
+
+// correct: +value, clear cell, back to board. wrong: -value, lock player, reopen buzz.
+export function judge(room, correct) {
+  if (room.phase !== 'buzzed' || !room.buzzedPlayerId) return;
+  const player = room.players[room.buzzedPlayerId];
+  const clue = activeClueObj(room);
+  if (!player || !clue) return;
+  if (correct) {
+    player.score += clue.value;
+    clue.done = true;
+    room.activeClue = null;
+    room.phase = 'board';
+    room.buzzedPlayerId = null;
+    room.lockedOut = [];
+    room.answerRevealed = false;
+  } else {
+    player.score -= clue.value;
+    room.lockedOut.push(room.buzzedPlayerId);
+    room.buzzedPlayerId = null;
+    room.phase = 'clue'; // reopen for others
+  }
+}
+
+export function revealAnswer(room) {
+  if (room.activeClue) room.answerRevealed = true;
+}
+
+// Host closes a clue nobody got: mark done, return to board.
+export function closeClue(room) {
+  const clue = activeClueObj(room);
+  if (clue) clue.done = true;
+  room.activeClue = null;
+  room.phase = 'board';
+  room.buzzedPlayerId = null;
+  room.lockedOut = [];
+  room.answerRevealed = false;
+}
+
+export function setScore(room, playerId, score) {
+  if (room.players[playerId]) room.players[playerId].score = Number(score) || 0;
+}
+
+export function resetGame(room, newBoard) {
+  if (newBoard) room.board = newBoard;
+  for (const cat of room.board.categories) {
+    for (const clue of cat.clues) clue.done = false;
+  }
+  for (const p of Object.values(room.players)) p.score = 0;
+  room.phase = 'board';
+  room.activeClue = null;
+  room.buzzedPlayerId = null;
+  room.lockedOut = [];
+  room.answerRevealed = false;
+}
+
+export function markDisconnected(socketId) {
+  const room = findRoomByPlayer(socketId);
+  if (!room) return null;
+  if (room.players[socketId]) room.players[socketId].connected = false;
+  if (room.hostId === socketId) room.hostConnected = false;
+  return room;
+}
+
+// ---- Views (what each side is allowed to see) ----
+
+function playersList(room) {
+  return Object.values(room.players).map((p) => ({
+    id: p.id,
+    name: p.name,
+    score: p.score,
+    connected: p.connected,
+  }));
+}
+
+// Host sees everything, including answers.
+export function hostView(room) {
+  return {
+    role: 'host',
+    roomCode: room.roomCode,
+    board: room.board,
+    players: playersList(room),
+    phase: room.phase,
+    activeClue: room.activeClue,
+    buzzedPlayerId: room.buzzedPlayerId,
+    lockedOut: room.lockedOut,
+    answerRevealed: room.answerRevealed,
+  };
+}
+
+// Players never receive un-revealed answers (would leak via network inspector).
+export function playerView(room) {
+  const board = {
+    title: room.board.title,
+    categories: room.board.categories.map((cat, ci) => ({
+      title: cat.title,
+      clues: cat.clues.map((cl, ii) => {
+        const isActive =
+          room.activeClue && room.activeClue.catIndex === ci && room.activeClue.clueIndex === ii;
+        return {
+          value: cl.value,
+          done: !!cl.done,
+          clue: isActive ? cl.clue : null,
+          answer: isActive && room.answerRevealed ? cl.answer : null,
+        };
+      }),
+    })),
+  };
+  return {
+    role: 'player',
+    roomCode: room.roomCode,
+    board,
+    players: playersList(room),
+    phase: room.phase,
+    activeClue: room.activeClue,
+    buzzedPlayerId: room.buzzedPlayerId,
+    lockedOut: room.lockedOut,
+    answerRevealed: room.answerRevealed,
+  };
+}
