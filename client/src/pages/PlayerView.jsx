@@ -4,6 +4,7 @@ import { socket } from '../socket.js';
 import Board from '../components/Board.jsx';
 import ClueModal from '../components/ClueModal.jsx';
 import Scoreboard from '../components/Scoreboard.jsx';
+import { useScareTriggers } from '../spooky/useScareTriggers.js';
 
 export default function PlayerView() {
   const { code } = useParams();
@@ -12,6 +13,8 @@ export default function PlayerView() {
   const [joined, setJoined] = useState(false);
   const [state, setState] = useState(null);
   const [error, setError] = useState('');
+
+  useScareTriggers(state);
 
   useEffect(() => {
     const onState = (s) => setState(s);

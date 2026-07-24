@@ -15,6 +15,7 @@ import {
 import Board from '../components/Board.jsx';
 import ClueModal from '../components/ClueModal.jsx';
 import Scoreboard from '../components/Scoreboard.jsx';
+import { useScareTriggers } from '../spooky/useScareTriggers.js';
 
 const CUSTOM_KEY = 'jeopardy.customBoard';
 
@@ -28,6 +29,8 @@ export default function HostView() {
   const [importedBoard, setImportedBoard] = useState(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+
+  useScareTriggers(state);
 
   useEffect(() => {
     const onState = (s) => setState(s);
