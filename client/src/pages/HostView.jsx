@@ -141,10 +141,34 @@ export default function HostView() {
   const inviteUrl = `${window.location.origin}/play/${roomCode}`;
 
   function copyLink() {
-    navigator.clipboard?.writeText(inviteUrl).then(() => {
+    const done = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    };
+    // navigator.clipboard only exists in a secure context (HTTPS or localhost),
+    // so plain-HTTP deployments need the legacy execCommand path.
+    function fallback() {
+      const ta = document.createElement('textarea');
+      ta.value = inviteUrl;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        done();
+      } catch {
+        // Nothing to do — the URL is shown next to the button for manual copying.
+      }
+      document.body.removeChild(ta);
+    }
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(inviteUrl).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
   }
 
   return (
