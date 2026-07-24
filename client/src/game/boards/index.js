@@ -39,14 +39,25 @@ export function boardFromCategoryIds(ids, title = 'Custom Mix') {
   return { title, categories: ids.map(categoryById) };
 }
 
-// Six random categories pulled from across every theme.
-export function randomMixBoard() {
-  const pool = [...allCategories];
+// Six random categories pulled from across every theme. `excludeIds` lets a
+// reroll guarantee a fresh set instead of risking the same categories again.
+export function randomMixBoard(excludeIds = []) {
+  const exclude = new Set(excludeIds);
+  const filtered = allCategories.filter((c) => !exclude.has(c.id));
+  const source = filtered.length >= CATEGORIES_PER_BOARD ? filtered : allCategories;
+  const pool = [...source];
   const picked = [];
   while (picked.length < CATEGORIES_PER_BOARD && pool.length) {
     picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
   }
   return boardFromCategoryIds(picked.map((c) => c.id), 'Random Mix');
+}
+
+// Resolve category ids from titles — used to exclude a board's current
+// categories from a reroll's pool (board objects only carry titles, not ids).
+export function categoryIdsForTitles(titles) {
+  const set = new Set(titles);
+  return allCategories.filter((c) => set.has(c.title)).map((c) => c.id);
 }
 
 // Blank 6x5 board for the editor.

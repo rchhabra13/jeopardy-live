@@ -10,6 +10,7 @@ import {
   themes,
   boardFromCategoryIds,
   randomMixBoard,
+  categoryIdsForTitles,
   CATEGORIES_PER_BOARD,
 } from '../game/boards/index.js';
 import Board from '../components/Board.jsx';
@@ -279,9 +280,15 @@ export default function HostView() {
         <div className="host-bar-actions">
           <button
             className="btn tiny secondary"
-            onClick={() => socket.emit('host:reset', { board: randomBoard() })}
+            onClick={() => {
+              // Exclude what's currently on screen so a reroll can never hand
+              // back the same 6 categories, and pull from the full pool of
+              // 138 rather than cycling through only the 23 fixed boards.
+              const excludeIds = categoryIdsForTitles(state.board.categories.map((c) => c.title));
+              socket.emit('host:reset', { board: randomMixBoard(excludeIds) });
+            }}
           >
-            New random board
+            🔀 Shuffle categories
           </button>
           <button className="btn tiny secondary" onClick={() => socket.emit('host:reset', {})}>
             Reset scores
