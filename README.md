@@ -21,7 +21,7 @@ Jeopardy Live turns any screen into a game board and any phone into a buzzer. Th
 board; players race to buzz in on their own devices. A Node/Socket.IO server acts as the referee —
 it decides who buzzed first and is the single source of truth for scores.
 
-Ships with **12 ready-to-play boards** (72 categories, 360 clues), a board editor, and JSON
+Ships with **20 ready-to-play boards** (120 categories, 600 clues), a board editor, and JSON
 import/export, so no API key, account, or network content fetch is ever required.
 
 ## Features
@@ -31,8 +31,12 @@ import/export, so no API key, account, or network content fetch is ever required
 - **Shareable room links** — 4-character room codes with deep links (`/play/AB12`)
 - **Live scoring** — correct adds the clue value, wrong subtracts it, locks that player out, and
   reopens buzzing for everyone else
-- **12 built-in boards** — General Knowledge, Science, World History, Geography, Movies, Music,
-  Sports, Video Games, Literature, Food & Drink, Space, Animals
+- **20 built-in boards / 120 categories / 600 clues** — General Knowledge, Science, World History,
+  Geography, Movies, Music, Sports, Video Games, Literature, Food & Drink, Space, Animals,
+  Internet & Memes, Superheroes, Mythology & Legends, Wordplay, 90s & 2000s Nostalgia,
+  Cartoons & Anime, Weird & Wonderful, and Pop Culture Grab Bag
+- **Mix your own board** — pick any 6 categories from across every theme, filter by theme, or take
+  a random cross-theme mix
 - **Board editor** — build custom boards in the browser, save locally, import/export JSON
 - **Answer privacy** — un-revealed answers are stripped server-side, so players can't read them
   out of the network payload
@@ -86,8 +90,9 @@ Open <http://localhost:5173>. To let phones join over your WiFi, use your machin
 
 ## Playing a game
 
-1. **Host** opens the app and picks a board — random, from the library, a saved custom board, or an
-   imported JSON file — then creates a room.
+1. **Host** opens the app and chooses content — a random board, a specific board from the library,
+   **six hand-picked categories**, a random cross-theme mix, a saved custom board, or an imported
+   JSON file — then creates a room.
 2. **Players** open the invite link on their phones and enter a name.
 3. **Host** clicks a clue. Buzzing opens for everyone.
 4. **Players** race to hit **BUZZ**. The first one through locks it.
@@ -99,7 +104,7 @@ Open <http://localhost:5173>. To let phones join over your WiFi, use your machin
 
 | Source | Where | Notes |
 |---|---|---|
-| Built-in library | `client/src/game/boards/library.js` | 12 boards × 6 categories × 5 clues |
+| Built-in library | `client/src/game/boards/library.js` | 20 boards × 6 categories × 5 clues |
 | Board editor | `/editor` route | Saves to `localStorage`, exports JSON |
 | JSON import | Host setup screen | Load any board file at game time |
 
@@ -183,7 +188,7 @@ front and point a domain at it.
 
 ## Known limitations
 
-- **Rooms are in-memory.** Restarting the server ends any game in progress. Fine for casual play;
+- **Rooms are in-memory.** Restarting the server ends any game in progress; idle rooms are reclaimed after 10 minutes. Fine for casual play;
   add Redis or a database for persistence.
 - **Reconnects create a new player.** Identity is tied to the socket id, so a player who fully
   reloads rejoins as a new entry (the host can correct scores manually).
