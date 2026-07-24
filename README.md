@@ -21,7 +21,7 @@ Jeopardy Live turns any screen into a game board and any phone into a buzzer. Th
 board; players race to buzz in on their own devices. A Node/Socket.IO server acts as the referee —
 it decides who buzzed first and is the single source of truth for scores.
 
-Ships with **20 ready-to-play boards** (120 categories, 600 clues), a board editor, and JSON
+Ships with **23 ready-to-play boards** (138 categories, 690 clues), a board editor, and JSON
 import/export, so no API key, account, or network content fetch is ever required.
 
 ## Features
@@ -31,10 +31,14 @@ import/export, so no API key, account, or network content fetch is ever required
 - **Shareable room links** — 4-character room codes with deep links (`/play/AB12`)
 - **Live scoring** — correct adds the clue value, wrong subtracts it, locks that player out, and
   reopens buzzing for everyone else
-- **20 built-in boards / 120 categories / 600 clues** — General Knowledge, Science, World History,
+- **23 built-in boards / 138 categories / 690 clues** — General Knowledge, Science, World History,
   Geography, Movies, Music, Sports, Video Games, Literature, Food & Drink, Space, Animals,
-  Internet & Memes, Superheroes, Mythology & Legends, Wordplay, 90s & 2000s Nostalgia,
-  Cartoons & Anime, Weird & Wonderful, and Pop Culture Grab Bag
+  Internet & Memes, Superheroes, Wordplay, 90s & 2000s Nostalgia, Cartoons & Anime,
+  Weird & Wonderful, Pop Culture Grab Bag, and four mythology boards spanning Greek, Norse,
+  Egyptian, Hindu, Japanese, Celtic, Chinese, Mesopotamian, Mesoamerican, Slavic, African,
+  and Polynesian traditions
+- **Haunted mode** — drifting ghosts, fog, a flickering crypt theme, cursed clues, jump scares on
+  wrong answers, hidden easter eggs, and a royalty-free ambience loop (all toggleable)
 - **Mix your own board** — pick any 6 categories from across every theme, filter by theme, or take
   a random cross-theme mix
 - **Board editor** — build custom boards in the browser, save locally, import/export JSON
@@ -104,7 +108,7 @@ Open <http://localhost:5173>. To let phones join over your WiFi, use your machin
 
 | Source | Where | Notes |
 |---|---|---|
-| Built-in library | `client/src/game/boards/library.js` | 20 boards × 6 categories × 5 clues |
+| Built-in library | `client/src/game/boards/library.js` | 23 boards × 6 categories × 5 clues |
 | Board editor | `/editor` route | Saves to `localStorage`, exports JSON |
 | JSON import | Host setup screen | Load any board file at game time |
 
@@ -157,6 +161,32 @@ Board shape:
 | `host:setScore` | client → server | `{ playerId, score }` | Manual score override |
 | `host:reset` | client → server | `{ board? }` | Resets scores and the board |
 | `state:update` | server → client | `GameState` | Broadcast after every change |
+
+## Spooky mode
+
+The game runs a haunted theme by default: a drifting ghost layer, fog, a flickering title, and a
+"cursed clue" tint that occasionally fires when a clue opens. A wrong answer has a chance of a
+full jump scare — a lunging ghoul plus a scream sting.
+
+Two toggles sit in the bottom-right corner and persist to `localStorage`:
+
+| Button | Controls |
+|---|---|
+| 👻 / 💀 | All spooky FX — ghosts, cursed clues, screen shake, and jump scares |
+| 🔊 / 🔇 | The looping background ambience |
+
+**Easter eggs.** The Konami code tears the veil. Typing `boo` anywhere is unwise. Knocking on the
+title enough times will get a response.
+
+**Audio.** Ambience and the scare sting are royalty-free YouTube embeds, played audio-only through
+hidden players — nothing is downloaded or redistributed. When YouTube is unreachable (offline or
+LAN-only play) the scare falls back to a WebAudio-synthesised screech, so the game still works with
+no external network.
+
+> [!NOTE]
+> Jump scares involve a sudden loud sound and a hard cut to a face. Flashing is kept slow and well
+> under photosensitivity thresholds, and `prefers-reduced-motion` disables the drift, flicker,
+> shake, and lunge animations. Anyone who would rather not be startled can switch FX off with 👻.
 
 ## Deployment
 
