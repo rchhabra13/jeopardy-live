@@ -19,6 +19,8 @@ import {
   setScore,
   resetGame,
   markDisconnected,
+  sweepRooms,
+  stats,
   hostView,
   playerView,
 } from './rooms.js';
@@ -27,7 +29,7 @@ const PORT = process.env.PORT || 3001;
 
 const app = express();
 app.use(cors());
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/health', (_req, res) => res.json({ ok: true, ...stats() }));
 
 // Single-service mode: if the client has been built, serve it from this same
 // process/port. One URL for everything — no CORS, no separate client host.
@@ -122,6 +124,13 @@ io.on('connection', (socket) => {
     if (room) broadcast(room);
   });
 });
+
+// Drop abandoned rooms so memory doesn't grow for the life of the process.
+const sweeper = setInterval(() => {
+  const removed = sweepRooms();
+  if (removed) console.log(`Swept ${removed} idle room(s). Now ${stats().rooms} active.`);
+}, 60 * 1000);
+sweeper.unref();
 
 httpServer.listen(PORT, () => {
   console.log(`Jeopardy server listening on :${PORT}`);

@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { socket } from '../socket.js';
-import { BOARDS, boardTitles, randomBoard, boardByIndex } from '../game/boards/index.js';
+import {
+  BOARDS,
+  boardTitles,
+  randomBoard,
+  boardByIndex,
+  allCategories,
+  themes,
+  boardFromCategoryIds,
+  randomMixBoard,
+  CATEGORIES_PER_BOARD,
+} from '../game/boards/index.js';
 import Board from '../components/Board.jsx';
 import ClueModal from '../components/ClueModal.jsx';
 import Scoreboard from '../components/Scoreboard.jsx';
@@ -13,6 +23,8 @@ export default function HostView() {
   const [roomCode, setRoomCode] = useState(null);
   const [source, setSource] = useState('random'); // 'random' | 'pick' | 'custom' | 'import'
   const [pickIndex, setPickIndex] = useState(0);
+  const [pickedCats, setPickedCats] = useState([]); // category ids for the custom mix
+  const [catFilter, setCatFilter] = useState('all');
   const [importedBoard, setImportedBoard] = useState(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -23,8 +35,23 @@ export default function HostView() {
     return () => socket.off('state:update', onState);
   }, []);
 
+  function toggleCat(id) {
+    setPickedCats((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : prev.length < CATEGORIES_PER_BOARD
+          ? [...prev, id]
+          : prev // ignore extra picks once 6 are chosen
+    );
+  }
+
   function chosenBoard() {
     if (source === 'random') return randomBoard();
+    if (source === 'mix') return randomMixBoard();
+    if (source === 'categories') {
+      if (pickedCats.length !== CATEGORIES_PER_BOARD) return null;
+      return boardFromCategoryIds(pickedCats);
+    }
     if (source === 'pick') return boardByIndex(pickIndex);
     if (source === 'custom') {
       const raw = localStorage.getItem(CUSTOM_KEY);
@@ -37,7 +64,11 @@ export default function HostView() {
   function createRoom() {
     const board = chosenBoard();
     if (!board?.categories?.length) {
-      setError('No valid board selected.');
+      setError(
+        source === 'categories'
+          ? `Pick exactly ${CATEGORIES_PER_BOARD} categories (${pickedCats.length} selected).`
+          : 'No valid board selected.'
+      );
       return;
     }
     setError('');
@@ -100,6 +131,65 @@ export default function HostView() {
             </select>
           )}
 
+          <label className="radio">
+            <input type="radio" checked={source === 'mix'} onChange={() => setSource('mix')} />
+            Random mix — 6 categories from across every theme
+          </label>
+
+          <label className="radio">
+            <input
+              type="radio"
+              checked={source === 'categories'}
+              onChange={() => setSource('categories')}
+            />
+            Choose my own categories
+          </label>
+          {source === 'categories' && (
+            <div className="cat-picker">
+              <div className="cat-picker-bar">
+                <select
+                  className="select"
+                  value={catFilter}
+                  onChange={(e) => setCatFilter(e.target.value)}
+                >
+                  <option value="all">All themes ({allCategories.length})</option>
+                  {themes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <span className={`cat-count ${pickedCats.length === CATEGORIES_PER_BOARD ? 'ok' : ''}`}>
+                  {pickedCats.length}/{CATEGORIES_PER_BOARD}
+                </span>
+                {pickedCats.length > 0 && (
+                  <button className="btn tiny secondary" onClick={() => setPickedCats([])}>
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="cat-list">
+                {allCategories
+                  .filter((c) => catFilter === 'all' || c.theme === catFilter)
+                  .map((c) => {
+                    const on = pickedCats.includes(c.id);
+                    const full = pickedCats.length >= CATEGORIES_PER_BOARD;
+                    return (
+                      <button
+                        key={c.id}
+                        className={`cat-chip ${on ? 'on' : ''}`}
+                        disabled={!on && full}
+                        onClick={() => toggleCat(c.id)}
+                      >
+                        <span className="chip-title">{c.title}</span>
+                        <span className="chip-theme">{c.theme}</span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
           <label className={`radio ${hasCustom ? '' : 'disabled'}`}>
             <input
               type="radio"
@@ -131,7 +221,9 @@ export default function HostView() {
             <Link to="/editor">Open Board Editor</Link>
             <Link to="/">Home</Link>
           </div>
-          <p className="muted small">{BOARDS.length} boards in the library.</p>
+          <p className="muted small">
+            {BOARDS.length} boards · {allCategories.length} categories in the library.
+          </p>
         </div>
       </div>
     );

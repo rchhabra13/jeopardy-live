@@ -2,6 +2,13 @@
 
 const rooms = new Map();
 
+// socketId -> roomCode, so per-event lookups are O(1) instead of scanning every room.
+const socketRoom = new Map();
+
+// A room with nobody connected is dropped after this long, so abandoned games
+// don't accumulate in memory for the life of the process.
+const EMPTY_TTL_MS = 10 * 60 * 1000;
+
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no easily-confused chars
 
 function genCode() {
@@ -27,26 +34,51 @@ export function createRoom(hostId, board) {
     buzzedPlayerId: null,
     lockedOut: [], // player ids that already guessed wrong on the active clue
     answerRevealed: false,
+    hostConnected: true,
+    emptySince: null,
   };
   rooms.set(roomCode, room);
+  socketRoom.set(hostId, roomCode);
   return room;
 }
+
+function hasLiveSockets(room) {
+  if (room.hostConnected) return true;
+  return Object.values(room.players).some((p) => p.connected);
+}
+
+// Called on every join/disconnect to keep the idle timer accurate.
+function refreshEmptyState(room, now = Date.now()) {
+  room.emptySince = hasLiveSockets(room) ? null : now;
+}
+
+// Periodic cleanup — drops rooms that have had nobody connected for EMPTY_TTL_MS.
+export function sweepRooms(now = Date.now()) {
+  let removed = 0;
+  for (const [code, room] of rooms) {
+    if (room.emptySince && now - room.emptySince > EMPTY_TTL_MS) {
+      for (const id of Object.keys(room.players)) socketRoom.delete(id);
+      socketRoom.delete(room.hostId);
+      rooms.delete(code);
+      removed++;
+    }
+  }
+  return removed;
+}
+
+export const stats = () => ({ rooms: rooms.size, sockets: socketRoom.size });
 
 export function getRoom(roomCode) {
   return rooms.get(roomCode);
 }
 
 export function findRoomByHost(hostId) {
-  for (const room of rooms.values()) if (room.hostId === hostId) return room;
-  return null;
+  const room = rooms.get(socketRoom.get(hostId));
+  return room && room.hostId === hostId ? room : null;
 }
 
 export function findRoomByPlayer(socketId) {
-  for (const room of rooms.values()) {
-    if (room.players[socketId]) return room;
-    if (room.hostId === socketId) return room;
-  }
-  return null;
+  return rooms.get(socketRoom.get(socketId)) || null;
 }
 
 export function addPlayer(room, socketId, name) {
@@ -57,6 +89,8 @@ export function addPlayer(room, socketId, name) {
     score: existing?.score || 0,
     connected: true,
   };
+  socketRoom.set(socketId, room.roomCode);
+  refreshEmptyState(room);
   return room.players[socketId];
 }
 
@@ -141,9 +175,11 @@ export function resetGame(room, newBoard) {
 
 export function markDisconnected(socketId) {
   const room = findRoomByPlayer(socketId);
+  socketRoom.delete(socketId);
   if (!room) return null;
   if (room.players[socketId]) room.players[socketId].connected = false;
   if (room.hostId === socketId) room.hostConnected = false;
+  refreshEmptyState(room);
   return room;
 }
 
