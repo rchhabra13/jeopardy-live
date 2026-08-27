@@ -37,7 +37,7 @@ jobs:
       - name: Load model credentials from Vault
         uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc
         with:
-          url: "https://apex-vault-gh.rishichhabra.com"
+          url: "https://apex-vault.rishichhabra.com"
           path: apex-github
           method: jwt
           role: apex-praas-01efcebf0dc9b26f
