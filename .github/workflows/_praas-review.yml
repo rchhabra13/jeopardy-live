@@ -16,7 +16,7 @@ on:
 jobs:
   review:
     name: "Review (${{ inputs.model }})"
-    runs-on: [self-hosted, apex]
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
@@ -30,14 +30,14 @@ jobs:
       # Check out the base branch, never the pull request head, so a pull request cannot
       # alter anything that runs in the same job as the Vault credentials.
       - name: Check out base branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           ref: ${{ github.event.pull_request.base.sha }}
 
       - name: Load model credentials from Vault
         uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc
         with:
-          url: "http://apex-vault.apex.svc.cluster.local:8200"
+          url: "https://apex-vault-gh.rishichhabra.com"
           path: apex-github
           method: jwt
           role: apex-praas-01efcebf0dc9b26f
@@ -47,13 +47,13 @@ jobs:
             secret/data/apex/praas/rchhabra13/jeopardy-live LOCAL_LLM_BASE | LOCAL_LLM_BASE ;
             secret/data/apex/praas/rchhabra13/jeopardy-live LOCAL_LLM_KEY | LOCAL_LLM_KEY ;
 
-      # OPENAI__API_BASE and the local key are only passed for openai/-prefixed (locally
+      # OPENAI__API_BASE and the local key are only exported for openai/-prefixed (locally
       # served) models. litellm's api_base is a GLOBAL override, not scoped to the openai
-      # provider — setting it unconditionally would route gemini/ calls at the local
-      # endpoint and fail them. Cloud OpenAI ids carry no prefix and take the cloud key.
+      # provider — setting it unconditionally would route gemini/ and anthropic/ calls at the
+      # local endpoint and fail them. Cloud OpenAI ids carry no prefix and take the cloud key.
       - name: Review pull request
         env:
-          PRAAS_IMAGE: ghcr.io/rchhabra13/praas-agent:v1
+          PRAAS_IMAGE: ghcr.io/rchhabra13/praas-agent@sha256:925ba750c37c91b01a1d5f38b2b52bf3df2075723d511ff2760c104f689f5c0a
           PR_URL: ${{ github.event.pull_request.html_url }}
           CONFIG__GIT_PROVIDER: github
           GITHUB__USER_TOKEN: ${{ github.token }}
@@ -70,6 +70,7 @@ jobs:
         run: |
           set -euo pipefail
           export GOOGLE_AI_STUDIO__GEMINI_API_KEY="${GEMINI_API_KEY:-}"
+          export ANTHROPIC__KEY="${ANTHROPIC_API_KEY:-}"
           if [[ "$CONFIG__MODEL" == openai/* ]]; then
             export OPENAI__API_BASE="${LOCAL_LLM_BASE:-}"
             export OPENAI__KEY="${LOCAL_LLM_KEY:-}"
@@ -83,6 +84,7 @@ jobs:
               -e CONFIG__GIT_PROVIDER \
               -e GITHUB__USER_TOKEN \
               -e GOOGLE_AI_STUDIO__GEMINI_API_KEY \
+              -e ANTHROPIC__KEY \
               -e OPENAI__API_BASE \
               -e OPENAI__KEY \
               -e CONFIG__MODEL \
