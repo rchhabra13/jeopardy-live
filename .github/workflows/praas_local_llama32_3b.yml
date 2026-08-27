@@ -1,0 +1,22 @@
+name: praas-local-llama3.2-3b
+
+on:
+  pull_request:
+    types: [labeled]
+
+# A reusable workflow only keeps the permissions its caller grants, so every caller
+# grants the same set the shared workflow needs.
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  review:
+    if: github.event.label.name == 'praas-local-llama3.2-3b' && github.event.sender.type != 'Bot'
+    name: Review with praas-agent (openai/llama3.2:3b)
+    uses: ./.github/workflows/_praas-review.yml
+    with:
+      model: "openai/llama3.2:3b"
+      max_model_tokens: "16384"
